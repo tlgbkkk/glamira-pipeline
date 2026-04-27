@@ -1,16 +1,32 @@
 import pymongo
 from src.config import MONGO_URI, DB_NAME
 
+
 def get_db_client():
     client = pymongo.MongoClient(MONGO_URI)
     return client
+
 
 def get_database():
     client = get_db_client()
     return client[DB_NAME]
 
+
 def get_product_targets(db):
+    product_col = db["product_dictionary"]
     summary_col = db["summary"]
+
+    if product_col.count_documents({}) > 0:
+        query = {
+            "status": {
+                "$not": {"$regex": "Success|404|Not found", "$options": "i"}
+            }
+        }
+
+        cursor = product_col.find(query)
+        product_targets = [{"product_id": doc["product_id"], "url": doc["url"]} for doc in cursor]
+
+        return product_targets
 
     group_1_events = [
         "view_product_detail", "select_product_option", "select_product_option_quality",
