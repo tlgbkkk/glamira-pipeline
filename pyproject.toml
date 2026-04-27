@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "glamira-pipeline"
+version = "0.1.0"
+description = ""
+authors = ["tlgb <tlgbkakaka@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+asyncio = "^4.0.0"
+pymongo = "^4.17.0"
+python-dotenv = "^1.2.2"
+aiolimiter = "^1.2.1"
+curl-cffi = "^0.15.0"
+ip2location = "^8.11.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
