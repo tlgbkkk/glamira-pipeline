@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import logging
 import os
+from pymongo import UpdateOne
 from src.database import get_database, get_product_targets
 from src.crawler.crawler import run_async_crawler, run_async_slow_crawler
 from src.geo.ip_processor import process_ip_locations
@@ -45,10 +46,22 @@ def run_crawler():
         results2 = asyncio.run(run_async_slow_crawler(retry_403_targets))
         final_results.extend(results2)
 
+    logger.info("Storing data...")
     if final_results:
-        product_col.drop()
-        product_col.insert_many(final_results)
-        logger.info(f"DONE! Saved {len(final_results)} products.")
+        operations = [
+            UpdateOne(
+                {"product_id": item["product_id"]},
+                {"$set": item},
+                upsert=True
+            )
+            for item in final_results
+        ]
+
+        result = product_col.bulk_write(operations)
+
+        logger.info(f"DONE! Upserted {len(final_results)} products into 'product_dictionary'")
+        logger.info(
+            f"MongoDB detail: Matched {result.matched_count}, Modified {result.modified_count}, Inserted {result.upserted_count}")
 
     logger.info(f"Crawl Time: {round(time.time() - start_time, 2)} secs")
 
@@ -57,7 +70,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glamira Data Pipeline")
     parser.add_argument("--job", choices=["crawl", "geo"], required=True,
                         help="Choose job: 'crawl' (get product information) or 'geo' (get location using IP)")
-    args = parser.add_argument()
+
     args = parser.parse_args()
 
     if args.job == "crawl":
