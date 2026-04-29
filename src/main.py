@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger("Main")
 
 
-def run_crawler():
+async def run_crawler():
     start_time = time.time()
     db = get_database()
     product_col = db["product_dictionary"]
@@ -43,6 +43,7 @@ def run_crawler():
             final_results.append(res)
 
     if retry_403_targets:
+        await asyncio.sleep(60)
         results2 = asyncio.run(run_async_slow_crawler(retry_403_targets))
         final_results.extend(results2)
 
