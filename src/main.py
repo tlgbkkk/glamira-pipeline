@@ -23,31 +23,44 @@ async def run_crawler():
     product_col = db["product_dictionary"]
 
     logger.info("Getting product urls from DB...")
-
     product_targets = get_product_targets(db)
-
     logger.info(f"Found {len(product_targets)} product IDs.")
 
     if not product_targets:
         logger.warning("No products found to crawl. Exiting...")
         return
-    results1 = asyncio.run(run_async_crawler(product_targets))
+
+    logger.info("=== Phase 1: Fast crawl ===")
+    results1 = await run_async_crawler(product_targets)
 
     final_results = []
-    retry_403_targets = []
+    retry_targets = []
 
     for res in results1:
-        if "403" in res.get("status", "") or "429" in res.get("status", ""):
-            retry_403_targets.append({"product_id": res["product_id"], "url": res["url"]})
+        status = res.get("status", "")
+        if "403" in status or "429" in status or "Unknown" in status:
+            retry_targets.append({"product_id": res["product_id"], "url": res["url"]})
         else:
             final_results.append(res)
 
-    if retry_403_targets:
-        await asyncio.sleep(60)
-        results2 = asyncio.run(run_async_slow_crawler(retry_403_targets))
-        final_results.extend(results2)
+    logger.info(f"Phase 1: {len(final_results)} OK, {len(retry_targets)} cần retry")
 
-    logger.info("Storing data...")
+    if retry_targets:
+        logger.info(f"=== Phase 2: Retry {len(retry_targets)} IDs ===")
+        await asyncio.sleep(60)
+        results2 = await run_async_slow_crawler(retry_targets)
+
+        still_failed = []
+        for res in results2:
+            status = res.get("status", "")
+            if "403" in status or "Unknown" in status:
+                still_failed.append(res)
+            final_results.append(res)
+
+        if still_failed:
+            logger.warning(f"{len(still_failed)} failed IDs found!")
+
+    logger.info(f"Storing {len(final_results)} records...")
     if final_results:
         operations = [
             UpdateOne(
@@ -56,13 +69,15 @@ async def run_crawler():
                 upsert=True
             )
             for item in final_results
+            if item.get("name")
         ]
 
-        result = product_col.bulk_write(operations)
-
-        logger.info(f"DONE! Upserted {len(final_results)} products into 'product_dictionary'")
-        logger.info(
-            f"MongoDB detail: Matched {result.matched_count}, Modified {result.modified_count}, Inserted {result.upserted_count}")
+        if operations:
+            result = product_col.bulk_write(operations)
+            logger.info(f"DONE! Upserted {len(operations)} products vào 'product_dictionary'")
+            logger.info(f"MongoDB: Matched {result.matched_count}, Modified {result.modified_count}, Inserted {result.upserted_count}")
+        else:
+            logger.warning("No valid records")
 
     logger.info(f"Crawl Time: {round(time.time() - start_time, 2)} secs")
 
@@ -70,11 +85,10 @@ async def run_crawler():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Glamira Data Pipeline")
     parser.add_argument("--job", choices=["crawl", "geo"], required=True,
-                        help="Choose job: 'crawl' (get product information) or 'geo' (get location using IP)")
-
+                        help="Choose job: 'crawl' or 'geo'")
     args = parser.parse_args()
 
     if args.job == "crawl":
-        run_crawler()
+        asyncio.run(run_crawler())
     elif args.job == "geo":
         process_ip_locations()
