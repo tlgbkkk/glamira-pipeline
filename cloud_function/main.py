@@ -15,26 +15,33 @@ gcs_client = storage.Client()
 
 SCHEMAS = {
     "summary_raw": [
-        bigquery.SchemaField("_id",                "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("time_stamp",         "INT64",  mode="NULLABLE"),
-        bigquery.SchemaField("ip",                 "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("user_agent",         "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("resolution",         "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("user_id_db",         "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("device_id",          "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("api_version",        "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("store_id",           "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("local_time",         "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("_id",           "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("time_stamp",    "INT64",  mode="NULLABLE"),
+        bigquery.SchemaField("ip",            "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("user_agent",    "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("resolution",    "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("user_id_db",    "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("device_id",     "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("api_version",   "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("store_id",      "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("local_time",    "STRING", mode="NULLABLE"),
         bigquery.SchemaField("show_recommendation","STRING", mode="NULLABLE"),
-        bigquery.SchemaField("current_url",        "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("referrer_url",       "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("email_address",      "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("collection",         "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("alloy",              "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("diamond",            "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("shapediamond",       "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("cat_id",             "STRING", mode="NULLABLE"),
-        bigquery.SchemaField("collect_id",         "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("current_url",   "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("referrer_url",  "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("email_address", "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("collection",    "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("option", "RECORD", mode="REPEATED", fields=[
+            bigquery.SchemaField("option_label", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("option_id",    "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("value_label",  "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("value_id",     "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("alloy",        "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("diamond",      "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("shapediamond", "STRING", mode="NULLABLE"),
+        ]),
+        bigquery.SchemaField("product_id",    "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("cat_id",        "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("collect_id",    "STRING", mode="NULLABLE"),
     ],
     "ip_locations": [
         bigquery.SchemaField("_id",     "STRING", mode="NULLABLE"),
@@ -88,19 +95,19 @@ def parse_price(value):
         logging.warning(f"Cannot parse price: '{value}'")
         return None
 
+
 def transform_summary_raw(row):
     row = flatten_oid(row)
-    option = row.pop("option", {}) or {}
-    # option co the la list hoac kieu khac
-    if isinstance(option, list):
-        option = option[0] if option else {}
-    if not isinstance(option, dict):
-        option = {}
-    row["alloy"]        = option.get("alloy", "")
-    row["diamond"]      = option.get("diamond", "")
-    row["shapediamond"] = option.get("shapediamond", "")
-    return row
+    option_raw = row.get("option")
 
+    if isinstance(option_raw, dict):
+        row["option"] = [option_raw]
+    elif isinstance(option_raw, list):
+        row["option"] = option_raw
+    else:
+        row["option"] = []
+
+    return row
 
 def transform_ip_locations(row):
     return flatten_oid(row)
