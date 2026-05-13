@@ -26,6 +26,7 @@ gcloud services enable \
 
 echo "2. Granting Permissions..."
 
+# BigQuery: tao job + doc/ghi data vao dataset
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${FUNCTION_SA}" \
     --role="roles/bigquery.jobUser" --quiet > /dev/null
@@ -47,7 +48,6 @@ gcloud functions deploy gcs_to_bq_trigger \
     --entry-point trigger_bigquery_load \
     --set-env-vars GCP_PROJECT=$PROJECT_ID,DATASET_ID=$DATASET_ID \
     --region $REGION \
-    --memory 512MB \
     --timeout 540s \
     --quiet
 
