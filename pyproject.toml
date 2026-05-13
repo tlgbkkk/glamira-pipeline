@@ -14,6 +14,7 @@ aiolimiter = "^1.2.1"
 curl-cffi = "^0.15.0"
 ip2location = "^8.11.0"
 google-cloud-storage= "^3.10.1"
+google-cloud-bigquery = "^3.41.0"
 
 
 [build-system]
