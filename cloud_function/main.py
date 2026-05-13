@@ -1,6 +1,9 @@
 import logging
+import os
 from google.cloud import bigquery
-from src.config import PROJECT_ID, DATASET_ID
+
+PROJECT_ID = os.environ.get("GCP_PROJECT")
+DATASET_ID = os.environ.get("DATASET_ID")
 
 bq_client = bigquery.Client()
 
@@ -32,11 +35,19 @@ def trigger_bigquery_load(event, context):
 
     try:
         load_job = bq_client.load_table_from_uri(
-            uri, table_id, job_config=job_config
+            uri,
+            table_id,
+            job_config=job_config
         )
+
         load_job.result()
 
         table = bq_client.get_table(table_id)
-        logging.info(f"Success! Loaded {load_job.output_rows} rows. Table {table_id} now has {table.num_rows} rows.")
+
+        logging.info(
+            f"Success! Loaded {load_job.output_rows} rows. "
+            f"Table {table_id} now has {table.num_rows} rows."
+        )
+
     except Exception as e:
         logging.error(f"Failed to load data into BigQuery: {e}")
