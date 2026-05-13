@@ -7,6 +7,7 @@ DATASET_ID = os.environ.get("DATASET_ID")
 
 bq_client = bigquery.Client()
 
+
 def trigger_bigquery_load(event, context):
     file_name = event['name']
     bucket_name = event['bucket']
@@ -16,7 +17,8 @@ def trigger_bigquery_load(event, context):
         return
 
     try:
-        table_name = file_name.split('/')[1]
+        parts = file_name.split('/')
+        table_name = parts[1]
     except IndexError:
         logging.warning(f"Could not parse table name from file: {file_name}")
         return
@@ -30,7 +32,15 @@ def trigger_bigquery_load(event, context):
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         autodetect=True,
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        ignore_unknown_values=True
+
+        ignore_unknown_values=True,
+
+        schema_update_options=[
+            bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION,
+            bigquery.SchemaUpdateOption.ALLOW_FIELD_RELAXATION
+        ],
+
+        max_bad_records=100
     )
 
     try:
@@ -43,11 +53,10 @@ def trigger_bigquery_load(event, context):
         load_job.result()
 
         table = bq_client.get_table(table_id)
-
         logging.info(
             f"Success! Loaded {load_job.output_rows} rows. "
             f"Table {table_id} now has {table.num_rows} rows."
         )
 
     except Exception as e:
-        logging.error(f"Failed to load data into BigQuery: {e}")
+        logging.error(f"❌ Failed to load data into BigQuery: {e}")
