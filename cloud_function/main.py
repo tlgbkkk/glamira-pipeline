@@ -93,6 +93,11 @@ def flatten_oid(row):
 def transform_summary_raw(row):
     row = flatten_oid(row)
     option = row.pop("option", {}) or {}
+    # option co the la list trong mot so record
+    if isinstance(option, list):
+        option = option[0] if option else {}
+    if not isinstance(option, dict):
+        option = {}
     row["alloy"]        = option.get("alloy", "")
     row["diamond"]      = option.get("diamond", "")
     row["shapediamond"] = option.get("shapediamond", "")
