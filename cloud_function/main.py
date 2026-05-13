@@ -1,8 +1,10 @@
 import io
 import json
 import logging
+import time
 import os
 
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import bigquery, storage
 
 PROJECT_ID = os.environ.get("GCP_PROJECT")
@@ -10,8 +12,6 @@ DATASET_ID = os.environ.get("DATASET_ID")
 
 bq_client  = bigquery.Client()
 gcs_client = storage.Client()
-
-BATCH_SIZE = 5000
 
 SCHEMAS = {
     "summary_raw": [
@@ -36,15 +36,13 @@ SCHEMAS = {
         bigquery.SchemaField("cat_id",             "STRING", mode="NULLABLE"),
         bigquery.SchemaField("collect_id",         "STRING", mode="NULLABLE"),
     ],
-
     "ip_locations": [
         bigquery.SchemaField("_id",     "STRING", mode="NULLABLE"),
         bigquery.SchemaField("ip",      "STRING", mode="NULLABLE"),
         bigquery.SchemaField("country", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("city",    "STRING", mode="NULLABLE"),
     ],
-
-    "products": [
+    "product_dictionary": [
         bigquery.SchemaField("_id",         "STRING",  mode="NULLABLE"),
         bigquery.SchemaField("product_id",  "STRING",  mode="NULLABLE"),
         bigquery.SchemaField("sku",         "STRING",  mode="NULLABLE"),
@@ -63,6 +61,13 @@ SCHEMAS = {
 }
 
 PRICE_FIELDS = {"base_price", "full_price", "sale_price"}
+
+def flatten_oid(row):
+    # {"$oid": "abc"} -> "abc"
+    if isinstance(row.get("_id"), dict) and "$oid" in row["_id"]:
+        row["_id"] = row["_id"]["$oid"]
+    return row
+
 
 def parse_price(value):
     if value is None:
@@ -83,17 +88,10 @@ def parse_price(value):
         logging.warning(f"Cannot parse price: '{value}'")
         return None
 
-
-def flatten_oid(row):
-    if isinstance(row.get("_id"), dict) and "$oid" in row["_id"]:
-        row["_id"] = row["_id"]["$oid"]
-    return row
-
-
 def transform_summary_raw(row):
     row = flatten_oid(row)
     option = row.pop("option", {}) or {}
-    # option co the la list trong mot so record
+    # option co the la list hoac kieu khac
     if isinstance(option, list):
         option = option[0] if option else {}
     if not isinstance(option, dict):
@@ -119,29 +117,46 @@ def transform_products(row):
 TRANSFORMS = {
     "summary_raw":  transform_summary_raw,
     "ip_locations": transform_ip_locations,
-    "products":     transform_products,
+    "product_dictionary":     transform_products,
 }
 
-
-def iter_lines_from_gcs(bucket_name, file_name):
+def process_file(bucket_name, file_name, transform):
     blob = gcs_client.bucket(bucket_name).blob(file_name)
+    out  = []
+    bad  = 0
     with blob.open("rt", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
-                yield line
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as e:
+                bad += 1
+                logging.warning(f"Bad JSON: {e}")
+                continue
+            if transform:
+                row = transform(row)
+            out.append(json.dumps(row, ensure_ascii=False))
+    if bad:
+        logging.warning(f"Skipped {bad} bad JSON lines")
+    return "\n".join(out).encode("utf-8")
 
 
-def load_batch_to_bq(batch_lines, table_id, job_config):
-    data = "\n".join(batch_lines).encode("utf-8")
-    load_job = bq_client.load_table_from_file(
-        io.BytesIO(data),
-        table_id,
-        job_config=job_config,
-    )
-    load_job.result()
-    return load_job.output_rows
-
+def load_to_bq(data, table_id, job_config, max_retries=5):
+    for attempt in range(1, max_retries + 1):
+        try:
+            job = bq_client.load_table_from_file(
+                io.BytesIO(data), table_id, job_config=job_config
+            )
+            job.result()
+            return job.output_rows
+        except gcp_exceptions.TooManyRequests:
+            wait = 2 ** attempt  # 2, 4, 8, 16, 32 giay
+            logging.warning(f"429 rate limit, retry {attempt}/{max_retries} sau {wait}s")
+            if attempt == max_retries:
+                raise
+            time.sleep(wait)
 
 def trigger_bigquery_load(event, context):
     file_name   = event["name"]
@@ -163,6 +178,9 @@ def trigger_bigquery_load(event, context):
 
     logging.info(f"Processing gs://{bucket_name}/{file_name} -> {table_id}")
 
+    data = process_file(bucket_name, file_name, transform)
+    logging.info(f"Transformed: {len(data) / 1024 / 1024:.1f} MB")
+
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
@@ -178,44 +196,5 @@ def trigger_bigquery_load(event, context):
             bigquery.SchemaUpdateOption.ALLOW_FIELD_RELAXATION,
         ]
 
-    total_rows  = 0
-    batch       = []
-    batch_count = 0
-
-    for raw_line in iter_lines_from_gcs(bucket_name, file_name):
-        try:
-            row = json.loads(raw_line)
-        except json.JSONDecodeError as e:
-            logging.warning(f"Skipping bad JSON: {e}")
-            continue
-
-        if transform:
-            row = transform(row)
-
-        batch.append(json.dumps(row, ensure_ascii=False))
-
-        if len(batch) >= BATCH_SIZE:
-            batch_count += 1
-            try:
-                n = load_batch_to_bq(batch, table_id, job_config)
-                total_rows += n
-                logging.info(f"Batch {batch_count}: loaded {n} rows (total so far: {total_rows})")
-            except Exception as e:
-                logging.error(f"Batch {batch_count} failed: {e}")
-                raise
-            finally:
-                batch.clear()  # free ram
-
-    if batch:
-        batch_count += 1
-        try:
-            n = load_batch_to_bq(batch, table_id, job_config)
-            total_rows += n
-            logging.info(f"Batch {batch_count} (final): loaded {n} rows")
-        except Exception as e:
-            logging.error(f"Final batch failed: {e}")
-            raise
-        finally:
-            batch.clear()
-
-    logging.info(f"Done. Total loaded: {total_rows} rows -> {table_id}")
+    n = load_to_bq(data, table_id, job_config)
+    logging.info(f"Done. Loaded {n} rows -> {table_id}")
