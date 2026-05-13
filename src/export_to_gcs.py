@@ -3,7 +3,7 @@ import logging
 from pymongo import MongoClient
 from google.cloud import storage
 from bson import json_util
-from config import MONGO_URI, DB_NAME, BUCKET_NAME
+from src.config import MONGO_URI, DB_NAME, BUCKET_NAME
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,8 +95,14 @@ def main():
     IS_TESTING = False
     limit_docs = 1000 if IS_TESTING else None
 
-    ip_geo_path = "data/ip_geo/IP-COUNTRY-REGION-CITY.BIN"
-    upload_local_file_to_gcs(bucket, ip_geo_path, "exports/ip_geo/IP-COUNTRY-REGION-CITY.BIN")
+    export_mongo_collection_to_gcs(
+        db=db,
+        bucket=bucket,
+        collection_name="ip_locations",
+        destination_folder="exports/ip_locations",
+        batch_size=200000,
+        limit=limit_docs
+    )
 
     export_mongo_collection_to_gcs(
         db=db,
