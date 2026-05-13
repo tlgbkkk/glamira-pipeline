@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 PROJECT_ID=$(gcloud config get-value project)
@@ -12,8 +11,10 @@ FUNCTION_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
 echo "=========================================================="
 echo "DEPLOYING CLOUD FUNCTION"
-echo "PROJECT_ID: $PROJECT_ID"
-echo "FUNCTION_SA: $FUNCTION_SA"
+echo "PROJECT_ID    : $PROJECT_ID"
+echo "FUNCTION_SA   : $FUNCTION_SA"
+echo "BUCKET        : $BUCKET_NAME"
+echo "DATASET       : $DATASET_ID"
 echo "=========================================================="
 
 echo "1. Enabling APIs..."
@@ -24,7 +25,7 @@ gcloud services enable \
     storage.googleapis.com --quiet
 
 echo "2. Granting Permissions..."
-# bq permission
+
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${FUNCTION_SA}" \
     --role="roles/bigquery.jobUser" --quiet > /dev/null
@@ -33,7 +34,6 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${FUNCTION_SA}" \
     --role="roles/bigquery.dataEditor" --quiet > /dev/null
 
-# gcs permission
 gcloud storage buckets add-iam-policy-binding gs://${BUCKET_NAME} \
     --member="serviceAccount:${FUNCTION_SA}" \
     --role="roles/storage.objectViewer" --quiet > /dev/null
@@ -47,6 +47,8 @@ gcloud functions deploy gcs_to_bq_trigger \
     --entry-point trigger_bigquery_load \
     --set-env-vars GCP_PROJECT=$PROJECT_ID,DATASET_ID=$DATASET_ID \
     --region $REGION \
+    --memory 512MB \
+    --timeout 540s \
     --quiet
 
 echo "=========================================================="
