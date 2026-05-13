@@ -1,23 +1,24 @@
+```bash
 #!/bin/bash
 
 set -e
 
 PROJECT_ID=$(gcloud config get-value project)
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-
 BUCKET_NAME="gcs-project-data"
 DATASET_ID="raw_layer"
 REGION="us-central1"
 
+FUNCTION_SA="${PROJECT_ID}@appspot.gserviceaccount.com"
+
 echo "=========================================================="
 echo "PROJECT_ID: $PROJECT_ID"
-echo "PROJECT_NUMBER: $PROJECT_NUMBER"
 echo "BUCKET_NAME: $BUCKET_NAME"
 echo "DATASET_ID: $DATASET_ID"
+echo "FUNCTION_SA: $FUNCTION_SA"
 echo "=========================================================="
 
 echo ""
-echo "1. Enable APIs"
+echo "1. Enable required APIs"
 echo "----------------------------------------------------------"
 
 gcloud services enable \
@@ -25,19 +26,10 @@ gcloud services enable \
     cloudbuild.googleapis.com \
     artifactregistry.googleapis.com \
     bigquery.googleapis.com \
-    storage.googleapis.com \
-    eventarc.googleapis.com
+    storage.googleapis.com
 
 echo ""
-echo "2. Get Cloud Function service account"
-echo "----------------------------------------------------------"
-
-FUNCTION_SA="${PROJECT_ID}@appspot.gserviceaccount.com"
-
-echo "Function SA: $FUNCTION_SA"
-
-echo ""
-echo "3. Grant BigQuery permissions"
+echo "2. Grant BigQuery permissions"
 echo "----------------------------------------------------------"
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
@@ -49,7 +41,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --role="roles/bigquery.dataEditor"
 
 echo ""
-echo "4. Grant GCS read permissions"
+echo "3. Grant GCS read permissions"
 echo "----------------------------------------------------------"
 
 gsutil iam ch \
@@ -57,19 +49,7 @@ gsutil iam ch \
     gs://${BUCKET_NAME}
 
 echo ""
-echo "5. Grant BigQuery service agent access to GCS"
-echo "----------------------------------------------------------"
-
-BQ_SERVICE_AGENT="service-${PROJECT_NUMBER}@gcp-sa-bigquery.iam.gserviceaccount.com"
-
-echo "BQ Service Agent: $BQ_SERVICE_AGENT"
-
-gsutil iam ch \
-    serviceAccount:${BQ_SERVICE_AGENT}:objectViewer \
-    gs://${BUCKET_NAME}
-
-echo ""
-echo "6. Deploy Cloud Function"
+echo "4. Deploy Cloud Function"
 echo "----------------------------------------------------------"
 
 gcloud functions deploy gcs_to_bq_trigger \
@@ -84,5 +64,6 @@ gcloud functions deploy gcs_to_bq_trigger \
 
 echo ""
 echo "=========================================================="
-echo "DONE!"
+echo "DEPLOY SUCCESS!"
 echo "=========================================================="
+```
