@@ -13,6 +13,7 @@ python-dotenv = "^1.2.2"
 aiolimiter = "^1.2.1"
 curl-cffi = "^0.15.0"
 ip2location = "^8.11.0"
+google-cloud-storage= "^3.10.1"
 
 
 [build-system]
