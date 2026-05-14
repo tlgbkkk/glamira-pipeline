@@ -49,6 +49,7 @@ gcloud functions deploy gcs_to_bq_trigger \
     --set-env-vars GCP_PROJECT=$PROJECT_ID,DATASET_ID=$DATASET_ID \
     --region $REGION \
     --timeout 540s \
+    --memory 2048MB \
     --quiet
 
 echo "=========================================================="

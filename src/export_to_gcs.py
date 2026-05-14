@@ -118,7 +118,7 @@ def main():
         bucket=bucket,
         collection_name="summary",
         destination_folder="exports/summary_raw",
-        batch_size=50000,
+        batch_size=200000,
         limit=limit_docs
     )
 
