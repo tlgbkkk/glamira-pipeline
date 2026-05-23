@@ -39,3 +39,7 @@ models:
     dataset:
       +materialized: table
       +schema: dataset
+
+seeds:
+  glamira_dbt:
+    +schema: raw_layer

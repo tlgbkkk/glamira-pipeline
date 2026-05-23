@@ -13,7 +13,7 @@ query_date = f"""
     SELECT 
         EXTRACT(DATE FROM MIN(TIMESTAMP_SECONDS(time_stamp))) as min_date,
         EXTRACT(DATE FROM MAX(TIMESTAMP_SECONDS(time_stamp))) as max_date
-    FROM `{PROJECT_ID}.glamira_raw.summary`
+    FROM `{PROJECT_ID}.raw_layer.summary_raw`
 """
 date_result = list(client.query(query_date).result())[0]
 min_date = date_result.min_date
@@ -22,7 +22,7 @@ print(f"-> Time range: {min_date} to {max_date}")
 
 query_currency = f"""
     SELECT DISTINCT UPPER(TRIM(currency)) as currency
-    FROM `{PROJECT_ID}.glamira_raw.product_dictionary`
+    FROM `{PROJECT_ID}.raw_layer.product_dictionary`
     WHERE currency IS NOT NULL 
       AND TRIM(currency) != ''
 """
