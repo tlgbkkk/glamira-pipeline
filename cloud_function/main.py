@@ -48,9 +48,10 @@ SCHEMAS = {
     "ip_locations": [
         bigquery.SchemaField("_id",     "STRING", mode="NULLABLE"),
         bigquery.SchemaField("ip",      "STRING", mode="NULLABLE"),
+        bigquery.SchemaField("region",  "STRING", mode="NULLABLE"),
         bigquery.SchemaField("country", "STRING", mode="NULLABLE"),
         bigquery.SchemaField("city",    "STRING", mode="NULLABLE"),
-    ],
+    ],  
     "product_dictionary": [
         bigquery.SchemaField("_id",         "STRING",  mode="NULLABLE"),
         bigquery.SchemaField("product_id",  "STRING",  mode="NULLABLE"),

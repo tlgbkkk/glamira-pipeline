@@ -39,6 +39,7 @@ def process_ip_locations():
             if rec and rec.country_long:
                 results.append({
                     "ip": ip,
+                    "region": rec.region,
                     "country": rec.country_long,
                     "city": rec.city
                 })
