@@ -36,9 +36,9 @@ models:
       +materialized: view
       +schema: staging
 
-    dataset:
+    marts:
       +materialized: table
-      +schema: dataset
+      +schema: marts
 
 seeds:
   glamira_dbt:

@@ -21,10 +21,57 @@ max_date = date_result.max_date
 print(f"-> Time range: {min_date} to {max_date}")
 
 query_currency = f"""
-    SELECT DISTINCT UPPER(TRIM(currency)) as currency
-    FROM `{PROJECT_ID}.raw_layer.product_dictionary`
-    WHERE currency IS NOT NULL 
-      AND TRIM(currency) != ''
+    SELECT DISTINCT currency FROM (
+        SELECT UPPER(TRIM(currency)) as currency
+        FROM `{PROJECT_ID}.raw_layer.product_dictionary`
+        WHERE currency IS NOT NULL AND TRIM(currency) != ''
+
+        UNION DISTINCT
+
+        SELECT
+            CASE
+                WHEN currency = '€'     THEN 'EUR'
+                WHEN currency = '£'     THEN 'GBP'
+                WHEN currency = '¥'     THEN 'JPY'
+                WHEN currency = '₩'     THEN 'KRW'
+                WHEN currency = '₹'     THEN 'INR'
+                WHEN currency = 'zł'    THEN 'PLN'
+                WHEN currency = 'Kč'    THEN 'CZK'
+                WHEN currency = 'Ft'    THEN 'HUF'
+                WHEN currency = 'lei'   THEN 'RON'
+                WHEN currency = 'din'   THEN 'RSD'
+                WHEN currency = '₺'     THEN 'TRY'
+                WHEN currency = 'R$'    THEN 'BRL'
+                WHEN currency = 'Fr'    THEN 'CHF'
+                WHEN currency = 'NZ$'   THEN 'NZD'
+                WHEN currency = 'A$'    THEN 'AUD'
+                WHEN currency = 'HK$'   THEN 'HKD'
+                WHEN currency = 'S$'    THEN 'SGD'
+                WHEN currency = 'CAD $' THEN 'CAD'
+                WHEN currency = 'CN¥'   THEN 'CNY'
+                WHEN currency = '₫'     THEN 'VND'
+                WHEN currency = 'Rp'    THEN 'IDR'
+                WHEN currency = '₱'     THEN 'PHP'
+                WHEN currency = 'RM'    THEN 'MYR'
+                WHEN currency = 'NT$'   THEN 'TWD'
+                WHEN currency = 'kr' AND current_url LIKE '%glamira.dk%' THEN 'DKK'
+                WHEN currency = 'kr' AND current_url LIKE '%glamira.no%' THEN 'NOK'
+                WHEN currency = 'kr' AND current_url LIKE '%glamira.se%' THEN 'SEK'
+                WHEN currency = 'kr' AND current_url LIKE '%glamira.is%' THEN 'ISK'
+                WHEN currency = '$'  AND current_url LIKE '%glamira.com.au%' THEN 'AUD'
+                WHEN currency = '$'  AND current_url LIKE '%glamira.ca%'     THEN 'CAD'
+                WHEN currency = '$'  AND current_url LIKE '%glamira.nz%'     THEN 'NZD'
+                WHEN currency = '$'  AND current_url LIKE '%glamira.sg%'     THEN 'SGD'
+                WHEN currency = '$'  AND current_url LIKE '%glamira.hk%'     THEN 'HKD'
+                WHEN currency = '$'                                           THEN 'USD'
+                ELSE UPPER(TRIM(currency))
+            END AS currency
+        FROM `{PROJECT_ID}.raw_layer.summary_raw`
+        WHERE currency IS NOT NULL
+          AND TRIM(currency) != ''
+          AND collection = 'checkout_success'
+    )
+    WHERE currency IS NOT NULL
 """
 currency_rows = client.query(query_currency).result()
 
