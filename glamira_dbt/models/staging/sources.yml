@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: glamira_raw
+    project: project-1bc108b6-f5bb-4f6a-993
+    dataset: raw_layer # bigquery dataset
+
+    tables:
+      - name: product_dictionary
+        description: "Success products data"
+
+      - name: summary_raw
+        description: "User data"
+
+      - name: ip_locations
+        description: "IP -> Locations data"
