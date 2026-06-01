@@ -1,31 +1,21 @@
 {{
     config(
         materialized='incremental',
-        unique_key='customer_key'
+        unique_key='currency_key'
     )
 }}
 
 WITH source_data AS (
-    SELECT
-        FARM_FINGERPRINT(customer_id) AS customer_key,
-        customer_id,
-        email_address AS email
-    FROM {{ ref('stg_summary_raw') }}
-
-    WHERE customer_id IS NOT NULL
-      AND customer_id != ''
-
-    QUALIFY ROW_NUMBER() OVER (
-        PARTITION BY customer_id
-        ORDER BY order_timestamp DESC
-    ) = 1
+    SELECT DISTINCT
+        FARM_FINGERPRINT(currency_code) AS currency_key,
+        currency_code
+    FROM {{ ref('stg_exchange_currency') }}
 ),
 
 final AS (
     SELECT
-        -1 AS customer_key,
-        'UNKNOWN' AS customer_id,
-        'unknown@unknown.com' AS email
+        -1 AS currency_key,
+        'UNKNOWN' AS currency_code
 
     UNION ALL
 
@@ -34,7 +24,9 @@ final AS (
 )
 
 SELECT
-    f.*,
+    f.currency_key,
+    f.currency_code,
+
     {% if is_incremental() %}
         COALESCE(t.created_at, CURRENT_TIMESTAMP()) AS created_at,
         COALESCE(t.created_by, SESSION_USER()) AS created_by,
@@ -50,5 +42,5 @@ FROM final f
 
 {% if is_incremental() %}
 LEFT JOIN {{ this }} t
-    ON f.customer_key = t.customer_key
+    ON f.currency_key = t.currency_key
 {% endif %}

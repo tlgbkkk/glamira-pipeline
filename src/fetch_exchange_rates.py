@@ -21,57 +21,138 @@ max_date = date_result.max_date
 print(f"-> Time range: {min_date} to {max_date}")
 
 query_currency = f"""
-    SELECT DISTINCT currency FROM (
-        SELECT UPPER(TRIM(currency)) as currency
-        FROM `{PROJECT_ID}.raw_layer.product_dictionary`
-        WHERE currency IS NOT NULL AND TRIM(currency) != ''
-
-        UNION DISTINCT
-
+    WITH all_currency AS (
+    
+        -- currency ở level order
         SELECT
-            CASE
-                WHEN currency = '€'     THEN 'EUR'
-                WHEN currency = '£'     THEN 'GBP'
-                WHEN currency = '¥'     THEN 'JPY'
-                WHEN currency = '₩'     THEN 'KRW'
-                WHEN currency = '₹'     THEN 'INR'
-                WHEN currency = 'zł'    THEN 'PLN'
-                WHEN currency = 'Kč'    THEN 'CZK'
-                WHEN currency = 'Ft'    THEN 'HUF'
-                WHEN currency = 'lei'   THEN 'RON'
-                WHEN currency = 'din'   THEN 'RSD'
-                WHEN currency = '₺'     THEN 'TRY'
-                WHEN currency = 'R$'    THEN 'BRL'
-                WHEN currency = 'Fr'    THEN 'CHF'
-                WHEN currency = 'NZ$'   THEN 'NZD'
-                WHEN currency = 'A$'    THEN 'AUD'
-                WHEN currency = 'HK$'   THEN 'HKD'
-                WHEN currency = 'S$'    THEN 'SGD'
-                WHEN currency = 'CAD $' THEN 'CAD'
-                WHEN currency = 'CN¥'   THEN 'CNY'
-                WHEN currency = '₫'     THEN 'VND'
-                WHEN currency = 'Rp'    THEN 'IDR'
-                WHEN currency = '₱'     THEN 'PHP'
-                WHEN currency = 'RM'    THEN 'MYR'
-                WHEN currency = 'NT$'   THEN 'TWD'
-                WHEN currency = 'kr' AND current_url LIKE '%glamira.dk%' THEN 'DKK'
-                WHEN currency = 'kr' AND current_url LIKE '%glamira.no%' THEN 'NOK'
-                WHEN currency = 'kr' AND current_url LIKE '%glamira.se%' THEN 'SEK'
-                WHEN currency = 'kr' AND current_url LIKE '%glamira.is%' THEN 'ISK'
-                WHEN currency = '$'  AND current_url LIKE '%glamira.com.au%' THEN 'AUD'
-                WHEN currency = '$'  AND current_url LIKE '%glamira.ca%'     THEN 'CAD'
-                WHEN currency = '$'  AND current_url LIKE '%glamira.nz%'     THEN 'NZD'
-                WHEN currency = '$'  AND current_url LIKE '%glamira.sg%'     THEN 'SGD'
-                WHEN currency = '$'  AND current_url LIKE '%glamira.hk%'     THEN 'HKD'
-                WHEN currency = '$'                                           THEN 'USD'
-                ELSE UPPER(TRIM(currency))
-            END AS currency
+            currency,
+            current_url
         FROM `{PROJECT_ID}.raw_layer.summary_raw`
         WHERE currency IS NOT NULL
           AND TRIM(currency) != ''
           AND collection = 'checkout_success'
+    
+        UNION ALL
+    
+        -- currency trong cart_products
+        SELECT
+            cp.currency,
+            sr.current_url
+        FROM `{PROJECT_ID}.raw_layer.summary_raw` sr,
+        UNNEST(sr.cart_products) cp
+        WHERE cp.currency IS NOT NULL
+          AND TRIM(cp.currency) != ''
+          AND sr.collection = 'checkout_success'
+    )
+    
+    SELECT DISTINCT currency
+    FROM (
+        SELECT
+            CASE
+    
+                -- direct ISO
+                WHEN UPPER(TRIM(currency)) IN (
+                    'AED','AFN','ALL','ARS','AUD','AZN','BGN','BOB',
+                    'BRL','CAD','CHF','CLP','CNY','COP','CRC','CZK',
+                    'DKK','DOP','EUR','GBP','GTQ','HKD','HNL','HRK',
+                    'HUF','IDR','INR','ISK','JPY','KRW','KWD','MDL',
+                    'MXN','MYR','NOK','NZD','PEN','PHP','PLN','PYG',
+                    'RON','RSD','SEK','SGD','TRY','TWD','USD','UYU',
+                    'VND','ZAR'
+                )
+                THEN UPPER(TRIM(currency))
+    
+                -- symbols
+                WHEN currency = '€'         THEN 'EUR'
+                WHEN currency = '£'         THEN 'GBP'
+                WHEN currency = '￥'        THEN 'JPY'
+                WHEN currency = '₹'         THEN 'INR'
+                WHEN currency = '₫'         THEN 'VND'
+                WHEN currency = '₱'         THEN 'PHP'
+                WHEN currency = '₲'         THEN 'PYG'
+                WHEN currency = '₺'         THEN 'TRY'
+                WHEN currency = '₩'         THEN 'KRW'
+    
+                -- local symbols
+                WHEN currency = 'zł'        THEN 'PLN'
+                WHEN currency = 'Kč'        THEN 'CZK'
+                WHEN currency = 'Ft'        THEN 'HUF'
+                WHEN currency = 'Lei'       THEN 'RON'
+                WHEN currency = 'lei'       THEN 'RON'
+                WHEN currency = 'din'       THEN 'RSD'
+                WHEN currency = ' din.'     THEN 'RSD'
+                WHEN currency = 'лв.'       THEN 'BGN'
+                WHEN currency = 'kn'        THEN 'HRK'
+                WHEN currency = 'د.ك.‏'     THEN 'KWD'
+    
+                -- explicit labels
+                WHEN currency = 'R$'        THEN 'BRL'
+                WHEN currency = 'CHF'       THEN 'CHF'
+                WHEN currency = 'NZD $'     THEN 'NZD'
+                WHEN currency = 'AU $'      THEN 'AUD'
+                WHEN currency = 'AUD $'     THEN 'AUD'
+                WHEN currency = 'HKD $'     THEN 'HKD'
+                WHEN currency = 'SGD $'     THEN 'SGD'
+                WHEN currency = 'CAD $'     THEN 'CAD'
+                WHEN currency = 'MXN $'     THEN 'MXN'
+                WHEN currency = 'CLP'       THEN 'CLP'
+                WHEN currency = 'COP $'     THEN 'COP'
+                WHEN currency = 'PEN S/.'   THEN 'PEN'
+                WHEN currency = 'GTQ Q'     THEN 'GTQ'
+                WHEN currency = 'CRC ₡'     THEN 'CRC'
+                WHEN currency = 'USD $'     THEN 'USD'
+                WHEN currency = 'BOB Bs'    THEN 'BOB'
+                WHEN currency = 'BOB BS'    THEN 'BOB'
+                WHEN currency = 'DOP $'     THEN 'DOP'
+                WHEN currency = 'NT$'       THEN 'TWD'
+                WHEN currency = 'RM'        THEN 'MYR'
+                WHEN currency = 'Rp'        THEN 'IDR'
+                WHEN currency = 'UYU'       THEN 'UYU'
+    
+                -- kr
+                WHEN currency = 'kr'
+                     AND current_url LIKE '%glamira.dk%' THEN 'DKK'
+    
+                WHEN currency = 'kr'
+                     AND current_url LIKE '%glamira.no%' THEN 'NOK'
+    
+                WHEN currency = 'kr'
+                     AND (
+                        current_url LIKE '%glamira.se%'
+                        OR current_url LIKE '%GLAMIRA.se%'
+                     ) THEN 'SEK'
+    
+                WHEN currency = 'kr'
+                     AND current_url LIKE '%glamira.is%' THEN 'ISK'
+    
+                -- $
+                WHEN currency = '$'
+                     AND current_url LIKE '%glamira.com.ar%' THEN 'ARS'
+    
+                WHEN currency = '$'
+                     AND current_url LIKE '%glamira.com.au%' THEN 'AUD'
+    
+                WHEN currency = '$'
+                     AND current_url LIKE '%glamira.ca%' THEN 'CAD'
+    
+                WHEN currency = '$'
+                     AND current_url LIKE '%glamira.nz%' THEN 'NZD'
+    
+                WHEN currency = '$'
+                     AND current_url LIKE '%glamira.sg%' THEN 'SGD'
+    
+                WHEN currency = '$'
+                     AND current_url LIKE '%glamira.hk%' THEN 'HKD'
+    
+                WHEN currency = '$' THEN 'USD'
+    
+                ELSE NULL
+    
+            END AS currency
+        FROM all_currency
     )
     WHERE currency IS NOT NULL
+    ORDER BY currency
 """
 currency_rows = client.query(query_currency).result()
 

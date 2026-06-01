@@ -116,6 +116,14 @@ def parse_price(value):
     s = str(value).strip()
     if not s:
         return None
+
+    s = s.strip(". '")
+    s = s.strip()
+
+    s = s.replace("'", "")
+
+    s = s.replace(" ", "")
+
     if "." in s and "," in s:
         if s.rfind(".") > s.rfind(","):
             s = s.replace(",", "")
@@ -123,6 +131,14 @@ def parse_price(value):
             s = s.replace(".", "").replace(",", ".")
     elif "," in s:
         s = s.replace(",", ".")
+    elif s.count(".") > 1:
+        s = s.replace(".", "")
+
+    s = s.lstrip(".")
+
+    if not s:
+        return None
+
     try:
         return float(s)
     except ValueError:
@@ -132,14 +148,43 @@ def parse_price(value):
 
 def transform_summary_raw(row):
     row = flatten_oid(row)
-    option_raw = row.get("option")
 
+    option_raw = row.get("option")
     if isinstance(option_raw, dict):
         row["option"] = [option_raw]
     elif isinstance(option_raw, list):
         row["option"] = option_raw
     else:
         row["option"] = []
+
+    if "price" in row:
+        row["price"] = parse_price(row["price"])
+
+    # cart_products
+    cart_products = row.get("cart_products")
+    if isinstance(cart_products, list):
+        cleaned = []
+        for cp in cart_products:
+            if not isinstance(cp, dict):
+                continue
+
+            # cart_products.option: object -> array
+            cp_option = cp.get("option")
+            if isinstance(cp_option, dict):
+                cp["option"] = [cp_option]
+            elif isinstance(cp_option, list):
+                cp["option"] = cp_option
+            else:
+                cp["option"] = []
+
+            # cart_products.price
+            if "price" in cp:
+                cp["price"] = parse_price(cp["price"])
+
+            cleaned.append(cp)
+        row["cart_products"] = cleaned
+    else:
+        row["cart_products"] = []
 
     return row
 

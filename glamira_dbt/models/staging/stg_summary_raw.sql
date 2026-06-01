@@ -5,41 +5,39 @@ WITH source_summary AS (
       AND collection = 'checkout_success'
 ),
 
-cart_exploded AS (
+deduped_source AS (
+    SELECT *
+    FROM source_summary
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY CAST(order_id AS STRING)
+        ORDER BY time_stamp DESC
+    ) = 1
+),
+
+aggregated_cart AS (
     SELECT
         s._id,
-        s.time_stamp,
-        s.ip,
-        s.user_agent,
-        s.resolution,
-        s.user_id_db,
-        s.device_id,
-        s.api_version,
-        s.store_id,
-        s.local_time,
-        s.show_recommendation,
-        s.current_url,
-        s.referrer_url,
-        s.email_address,
-        s.collection,
-        s.order_id,
-        s.is_paypal,
-        s.utm_source,
-        s.utm_medium,
-        s.option,
-        s.key_search,
-        s.viewing_product_id,
-        s.recommendation,
-        s.recommendation_clicked_position,
-        s.recommendation_product_id,
-        s.recommendation_product_position,
-        cp.product_id   AS product_id,
-        cp.price        AS price,
-        cp.currency     AS currency,
-        cp.amount       AS order_quantity,
-        cp.option       AS cart_product_options
-    FROM source_summary s,
-    UNNEST(s.cart_products) AS cp
+        cp.product_id,
+        cp.price,
+        ANY_VALUE(COALESCE(cp.currency, s.currency)) AS currency,
+        SUM(COALESCE(SAFE_CAST(cp.amount AS INT64), 1)) AS order_quantity,
+        ANY_VALUE(cp.option) AS cart_product_options
+    FROM deduped_source s
+    CROSS JOIN UNNEST(s.cart_products) cp
+    GROUP BY s._id, cp.product_id, cp.price
+),
+
+cart_exploded AS (
+    SELECT
+        s.* EXCEPT(cart_products, product_id, price, currency),
+        c.product_id,
+        c.price,
+        c.currency,
+        c.order_quantity,
+        c.cart_product_options
+    FROM deduped_source s
+    JOIN aggregated_cart c
+        ON s._id = c._id
 ),
 
 with_location AS (
@@ -55,10 +53,10 @@ with_location AS (
 
 SELECT
     CAST(_id AS STRING)                                         AS event_id,
-    CAST(order_id AS STRING)                                    AS order_id,
+    CAST(CAST(order_id AS FLOAT64) AS INT64)                    AS order_id,
     TO_HEX(SHA256(CAST(user_id_db AS STRING)))                  AS customer_id,
     CAST(product_id AS STRING)                                  AS product_id,
-    CAST(store_id AS STRING)                                    AS store_id,
+    CAST(CAST(store_id AS FLOAT64) AS INT64)                    AS store_id,
     TO_HEX(SHA256(CAST(device_id AS STRING)))                   AS device_code,
     TIMESTAMP_SECONDS(CAST(time_stamp AS INT64))                AS order_timestamp,
     DATE(TIMESTAMP_SECONDS(CAST(time_stamp AS INT64)))          AS actual_date,
@@ -89,30 +87,52 @@ SELECT
     city_name,
     region_name,
     CASE
-        WHEN currency = '€'     THEN 'EUR'
-        WHEN currency = '£'     THEN 'GBP'
-        WHEN currency = '¥'     THEN 'JPY'
-        WHEN currency = '₩'     THEN 'KRW'
-        WHEN currency = '₹'     THEN 'INR'
-        WHEN currency = 'zł'    THEN 'PLN'
-        WHEN currency = 'Kč'    THEN 'CZK'
-        WHEN currency = 'Ft'    THEN 'HUF'
-        WHEN currency = 'lei'   THEN 'RON'
-        WHEN currency = 'din'   THEN 'RSD'
-        WHEN currency = '₺'     THEN 'TRY'
-        WHEN currency = 'R$'    THEN 'BRL'
-        WHEN currency = 'Fr'    THEN 'CHF'
-        WHEN currency = 'NZ$'   THEN 'NZD'
-        WHEN currency = 'A$'    THEN 'AUD'
-        WHEN currency = 'HK$'   THEN 'HKD'
-        WHEN currency = 'S$'    THEN 'SGD'
-        WHEN currency = 'CAD $' THEN 'CAD'
-        WHEN currency = 'CN¥'   THEN 'CNY'
-        WHEN currency = '₫'     THEN 'VND'
-        WHEN currency = 'Rp'    THEN 'IDR'
-        WHEN currency = '₱'     THEN 'PHP'
-        WHEN currency = 'RM'    THEN 'MYR'
-        WHEN currency = 'NT$'   THEN 'TWD'
+        WHEN currency = '€'         THEN 'EUR'
+        WHEN currency = '£'         THEN 'GBP'
+        WHEN currency = '¥'         THEN 'JPY'
+        WHEN currency = '円'         THEN 'JPY'
+        WHEN currency = '₩'         THEN 'KRW'
+        WHEN currency = '₹'         THEN 'INR'
+        WHEN currency = 'zł'        THEN 'PLN'
+        WHEN currency = 'Kč'        THEN 'CZK'
+        WHEN currency = 'Ft'        THEN 'HUF'
+        WHEN currency = 'lei'       THEN 'RON'
+        WHEN currency = 'Lei'       THEN 'RON'
+        WHEN currency = 'din'       THEN 'RSD'
+        WHEN currency = ' din.'     THEN 'RSD'
+        WHEN currency = 'лв.'       THEN 'BGN'
+        WHEN currency = '₺'         THEN 'TRY'
+        WHEN currency = 'R$'        THEN 'BRL'
+        WHEN currency = 'Fr'        THEN 'CHF'
+        WHEN currency = 'CHF'       THEN 'CHF'
+        WHEN currency = 'NZ$'       THEN 'NZD'
+        WHEN currency = 'NZD $'     THEN 'NZD'
+        WHEN currency = 'A$'        THEN 'AUD'
+        WHEN currency = 'AU $'      THEN 'AUD'
+        WHEN currency = 'HK$'       THEN 'HKD'
+        WHEN currency = 'HKD $'     THEN 'HKD'
+        WHEN currency = 'S$'        THEN 'SGD'
+        WHEN currency = 'SGD $'     THEN 'SGD'
+        WHEN currency = 'CAD $'     THEN 'CAD'
+        WHEN currency = 'CN¥'       THEN 'CNY'
+        WHEN currency = '₫'         THEN 'VND'
+        WHEN currency = 'Rp'        THEN 'IDR'
+        WHEN currency = '₱'         THEN 'PHP'
+        WHEN currency = 'RM'        THEN 'MYR'
+        WHEN currency = 'NT$'       THEN 'TWD'
+        WHEN currency = 'MXN $'     THEN 'MXN'
+        WHEN currency = 'CLP'       THEN 'CLP'
+        WHEN currency = 'COP $'     THEN 'COP'
+        WHEN currency = 'PEN S/.'   THEN 'PEN'
+        WHEN currency = 'GTQ Q'     THEN 'GTQ'
+        WHEN currency = 'CRC ₡'     THEN 'CRC'
+        WHEN currency = 'USD $'     THEN 'USD'
+        WHEN currency = 'UYU'       THEN 'UYU'
+        WHEN currency = '₲'         THEN 'PYG'
+        WHEN currency = 'BOB Bs'    THEN 'BOB'
+        WHEN currency = 'DOP $'     THEN 'DOP'
+        WHEN currency = 'kn'        THEN 'HRK'
+        WHEN currency = 'د.ك.‏'      THEN 'KWD'
         WHEN currency = 'kr' AND current_url LIKE '%glamira.dk%' THEN 'DKK'
         WHEN currency = 'kr' AND current_url LIKE '%glamira.no%' THEN 'NOK'
         WHEN currency = 'kr' AND current_url LIKE '%glamira.se%' THEN 'SEK'
