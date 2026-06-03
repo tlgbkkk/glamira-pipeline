@@ -43,9 +43,9 @@ final AS (
     SELECT
         FARM_FINGERPRINT(
           CONCAT(
-            CAST(order_id AS STRING),
+            CAST(s.order_id AS STRING),
             '|',
-            CAST(COALESCE(product_key, -1) AS STRING),
+            COALESCE(s.product_id, '-1'),
             '|',
             CAST(COALESCE(s.price, 0) AS STRING)
           )
