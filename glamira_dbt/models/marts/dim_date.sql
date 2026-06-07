@@ -18,7 +18,7 @@ source_data AS (
         FARM_FINGERPRINT(CAST(date_day AS STRING)) AS date_key,
         date_day AS actual_date,
         FORMAT_DATE('%A', date_day) AS day_name,
-        FORMAT_DATE('%B', date_day) AS month_name,
+        EXTRACT(MONTH FROM date_day) AS month_number,
         EXTRACT(YEAR FROM date_day) AS year_number,
         EXTRACT(QUARTER FROM date_day) AS quarter_number,
         CASE
@@ -41,7 +41,7 @@ final AS (
         -1 AS date_key,
         DATE('1970-01-01') AS actual_date,
         'Unknown' AS day_name,
-        'Unknown' AS month_name,
+        0 AS month_number,
         0 AS year_number,
         0 AS quarter_number,
         FALSE AS is_weekend

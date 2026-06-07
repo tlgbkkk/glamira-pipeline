@@ -1,0 +1,220 @@
+version: 2
+
+models:
+  - name: fact_sales_order_detail
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+    columns:
+      - name: sales_order_detail_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: price
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: order_quantity
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      - name: line_total
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: date_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: product_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: customer_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: currency_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: location_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: device_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: order_id
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: store_id
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+
+  - name: dim_customer
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          column_list: ["customer_id", "start_date"]
+    columns:
+      - name: customer_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: customer_id
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: email
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_value_lengths_to_be_between:
+              min_value: 5
+      - name: start_date
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: end_date
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: is_current
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_of_type:
+              column_type: BOOLEAN
+
+  - name: dim_product
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+    columns:
+      - name: product_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: product_id
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: product_name
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: base_price
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: full_price
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: sale_price
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: currency_code
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_value_lengths_to_equal:
+              value: 3
+              row_condition: "currency_code != 'UNKNOWN'"
+
+  - name: dim_date
+    columns:
+      - name: date_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: actual_date
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: year_number
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 2000
+              max_value: 3000
+              row_condition: "date_key != -1"
+      - name: quarter_number
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 4
+              row_condition: "date_key != -1"
+      - name: is_weekend
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_of_type:
+              column_type: BOOLEAN
+
+  - name: dim_currency
+    columns:
+      - name: currency_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: currency_code
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_value_lengths_to_equal:
+              value: 3
+              row_condition: "currency_code != 'UNKNOWN'"
+
+  - name: dim_location
+    columns:
+      - name: location_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: country_name
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: city_name
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: region_name
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+
+  - name: dim_device
+    columns:
+      - name: device_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: device_code
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+
+  - name: fact_exchange_currency
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+      - dbt_expectations.expect_compound_columns_to_be_unique:
+          column_list: ["currency_key", "month_number", "year_number"]
+    columns:
+      - name: exchange_currency_key
+        tests:
+          - dbt_expectations.expect_column_values_to_be_unique
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: currency_key
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+      - name: rate_to_usd
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: month_number
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 12
+      - name: year_number
+        tests:
+          - dbt_expectations.expect_column_values_to_not_be_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 2000
+              max_value: 2030

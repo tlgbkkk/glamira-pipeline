@@ -19,6 +19,7 @@ dim_product AS (
 
 dim_customer AS (
     SELECT customer_key, customer_id FROM {{ ref('dim_customer') }}
+    WHERE is_current = TRUE
 ),
 
 dim_device AS (
@@ -61,7 +62,7 @@ final AS (
         s.ip_address,
         COALESCE(s.price, 0) AS price,
         s.order_quantity,
-        ROUND(s.price * s.order_quantity, 2) AS line_total
+        ROUND(COALESCE(s.price, 0) * s.order_quantity, 2) AS line_total
     FROM stg s
     LEFT JOIN dim_date dd
         ON s.actual_date = dd.actual_date
@@ -72,7 +73,7 @@ final AS (
     LEFT JOIN dim_device dv
         ON s.device_code = dv.device_code
     LEFT JOIN ip_locations il
-        ON s.ip_address = TO_HEX(SHA256(CAST(il.ip_address AS STRING)))
+        ON s.ip_address = il.ip_address
     LEFT JOIN dim_location dl
         ON il.country_name = dl.country_name
         AND il.city_name   = dl.city_name

@@ -18,7 +18,7 @@ WITH source_data AS (
         base_price,
         full_price,
         sale_price,
-        currency,
+        currency AS currency_code,
         gold_weight
     FROM {{ ref('stg_product_dictionary') }}
 
@@ -37,7 +37,7 @@ final AS (
         0 AS base_price,
         0 AS full_price,
         0 AS sale_price,
-        'UNKNOWN' AS currency,
+        'UNKNOWN' AS currency_code,
         0 AS gold_weight
 
     UNION ALL
@@ -57,7 +57,7 @@ SELECT
     f.base_price,
     f.full_price,
     f.sale_price,
-    f.currency,
+    f.currency_code,
     f.gold_weight,
 
     {% if is_incremental() %}
