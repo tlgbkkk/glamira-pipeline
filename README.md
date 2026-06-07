@@ -267,7 +267,7 @@ The dashboard is built on **Looker Studio** connected directly to the BigQuery `
 
 ### Live Link
 
-[View Dashboard →](https://lookerstudio.google.com/your-dashboard-link)
+[View Dashboard →](https://datastudio.google.com/reporting/ba3b8ad7-7f61-4fae-8181-c6d9075a3bac)
 
 ### Key metrics covered
 
